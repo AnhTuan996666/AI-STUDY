@@ -1,0 +1,31 @@
+[project]
+name = "ollama-lab"
+version = "0.1.0"
+description = "Lớp thử nghiệm model Ollama bằng Python"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+# --- taskipy: "npm scripts" cho Python ---
+# Chạy:  task <ten>       (vd: task ping, task chat "cau hoi")
+# Xem danh sach:  task --list
+[tool.taskipy.tasks]
+ping   = { cmd = "python scripts/step0_check.py", help = "Ollama song chua + liet ke model da pull" }
+chat   = { cmd = "python scripts/step1_chat_once.py", help = "Goi model 1 lan, cho tra loi day du. Vd: task chat \"cau hoi\"" }
+stream = { cmd = "python scripts/step2_chat_stream.py", help = "Goi model streaming + do TTFT. Vd: task stream \"cau hoi\"" }
+repl   = { cmd = "python scripts/step3_chat_terminal.py", help = "Chat nhieu luot trong terminal, nho ngu canh" }
+test   = { cmd = "pytest", help = "Chay test (dung MockTransport, KHONG can Ollama)" }
+lint   = { cmd = "ruff check .", help = "Kiem tra loi style/import" }
+fix    = { cmd = "ruff check . --fix", help = "Tu sua loi lint sua duoc" }
+fmt    = { cmd = "ruff format .", help = "Format lai code" }
+check  = { cmd = "ruff check . && pytest", help = "Chay het: lint + test (dung truoc khi commit)" }

@@ -1,0 +1,18 @@
+# Normalise line endings: the repo stores LF, Windows checkouts still get CRLF.
+* text=auto eol=lf
+
+# PowerShell keeps CRLF so the Windows ISE and older hosts do not choke.
+*.ps1 text eol=crlf
+
+# Shell scripts must stay LF or Linux runners fail with "bad interpreter".
+*.sh text eol=lf
+
+# Binary: never touch.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.pdf binary

@@ -1,0 +1,8 @@
+# Ràng buộc tối thiểu (>=) để pip lấy được wheel dựng sẵn trên Python 3.14.
+httpx>=0.28
+python-dotenv>=1.0
+
+# dev
+pytest>=8.3
+ruff>=0.9
+taskipy>=1.14

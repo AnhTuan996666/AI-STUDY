@@ -1,0 +1,70 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+# Never let two deploys of the same service overlap.
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+jobs:
+  frontend:
+    name: frontend -> Vercel
+    runs-on: ubuntu-latest
+    # workflow_dispatch has no CI result to read, so only gate the automatic path.
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    steps:
+      - uses: actions/checkout@v4
+
+      # Secrets are unreadable in a job-level `if`, so the gate has to be a step.
+      - name: Check secrets
+        id: gate
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          if [ -n "$VERCEL_TOKEN" ] && [ -n "$VERCEL_ORG_ID" ] && [ -n "$VERCEL_PROJECT_ID" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Bỏ qua deploy frontend — chưa cấu hình VERCEL_TOKEN / VERCEL_ORG_ID / VERCEL_PROJECT_ID. Xem docs/CI_CD.md."
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.ready == 'true'
+        with:
+          node-version: '22'
+
+      - name: Deploy
+        if: steps.gate.outputs.ready == 'true'
+        working-directory: frontend
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          npx --yes vercel@latest pull --yes --environment=production --token="${{ secrets.VERCEL_TOKEN }}"
+          npx --yes vercel@latest build --prod --token="${{ secrets.VERCEL_TOKEN }}"
+          npx --yes vercel@latest deploy --prebuilt --prod --token="${{ secrets.VERCEL_TOKEN }}"
+
+  backend:
+    name: backend -> Render
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    steps:
+      # Render pulls the code itself; the hook only tells it to start a build.
+      - name: Trigger deploy hook
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "::notice::Bỏ qua deploy backend — chưa cấu hình RENDER_DEPLOY_HOOK_URL. Xem docs/CI_CD.md."
+            exit 0
+          fi
+          curl --fail --silent --show-error --location "$HOOK" > /dev/null
+          echo "Đã gửi yêu cầu deploy tới Render."

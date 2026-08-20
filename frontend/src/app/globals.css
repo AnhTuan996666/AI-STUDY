@@ -1,0 +1,240 @@
+@import 'tailwindcss';
+
+/*
+ * Bảng màu dựng theo giao diện ChatGPT.
+ *
+ * Dùng `@theme inline` để utility trỏ thẳng vào biến thô (`var(--c-bg)`) thay vì
+ * `var(--color-bg)`. Nhờ vậy chỉ cần ghi đè biến thô trong media query là cả giao
+ * diện đổi sang dark, không phải sinh lại token.
+ */
+@theme inline {
+  --color-bg: var(--c-bg);
+  --color-sidebar: var(--c-sidebar);
+  --color-hover: var(--c-hover);
+  --color-active: var(--c-active);
+  --color-composer: var(--c-composer);
+  --color-bubble: var(--c-bubble);
+  --color-border-subtle: var(--c-border);
+  --color-text-primary: var(--c-text);
+  --color-text-muted: var(--c-text-muted);
+  --color-text-faint: var(--c-text-faint);
+  --color-accent: var(--c-accent);
+  --color-accent-contrast: var(--c-accent-contrast);
+  --color-danger: var(--c-danger);
+  --color-online: var(--c-online);
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Code', 'Consolas', monospace;
+}
+
+:root {
+  --c-bg: #ffffff;
+  --c-sidebar: #f9f9f9;
+  --c-hover: #ececec;
+  --c-active: #e3e3e3;
+  --c-composer: #ffffff;
+  --c-bubble: #f4f4f4;
+  --c-border: #e5e5e5;
+  --c-text: #0d0d0d;
+  --c-text-muted: #5d5d5d;
+  --c-text-faint: #8f8f8f;
+  --c-accent: #0d0d0d;
+  --c-accent-contrast: #ffffff;
+  --c-danger: #e02b2b;
+  --c-online: #2ea043;
+
+  /* Đổ bóng của khung soạn tin — Tailwind không có sẵn mức nhẹ như vậy. */
+  --shadow-composer: 0 2px 6px rgb(0 0 0 / 0.05), 0 0 0 1px rgb(0 0 0 / 0.04);
+  --shadow-popover: 0 12px 32px rgb(0 0 0 / 0.14);
+  --code-bg: #f6f6f6;
+}
+
+/*
+ * Dark có hai đường vào, nên khối giá trị phải lặp lại hai lần (CSS không cho dùng
+ * chung một khai báo cho hai ngữ cảnh khác nhau):
+ *   1. Theme "system"  -> theo cài đặt máy, nhưng nhường nếu người dùng đã ép sáng.
+ *   2. Theme "dark"    -> `useSettings` gắn data-theme lên <html>, thắng mọi trường hợp.
+ * Sửa màu thì nhớ sửa cả hai khối.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --c-bg: #212121;
+    --c-sidebar: #171717;
+    --c-hover: #2f2f2f;
+    --c-active: #303030;
+    --c-composer: #303030;
+    --c-bubble: #303030;
+    --c-border: #3d3d3d;
+    --c-text: #ececec;
+    --c-text-muted: #b4b4b4;
+    --c-text-faint: #8f8f8f;
+    --c-accent: #ffffff;
+    --c-accent-contrast: #0d0d0d;
+    --c-danger: #ff6b6b;
+    --c-online: #3fb950;
+
+    --shadow-composer: 0 2px 6px rgb(0 0 0 / 0.25);
+    --shadow-popover: 0 12px 32px rgb(0 0 0 / 0.5);
+    --code-bg: #1e1e1e;
+  }
+}
+
+:root[data-theme='dark'] {
+  --c-bg: #212121;
+  --c-sidebar: #171717;
+  --c-hover: #2f2f2f;
+  --c-active: #303030;
+  --c-composer: #303030;
+  --c-bubble: #303030;
+  --c-border: #3d3d3d;
+  --c-text: #ececec;
+  --c-text-muted: #b4b4b4;
+  --c-text-faint: #8f8f8f;
+  --c-accent: #ffffff;
+  --c-accent-contrast: #0d0d0d;
+  --c-danger: #ff6b6b;
+  --c-online: #3fb950;
+
+  --shadow-composer: 0 2px 6px rgb(0 0 0 / 0.25);
+  --shadow-popover: 0 12px 32px rgb(0 0 0 / 0.5);
+  --code-bg: #1e1e1e;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background-color: var(--c-bg);
+  color: var(--c-text);
+  font-family: var(--font-sans);
+}
+
+/* Thanh cuộn mảnh, chỉ hiện khi rê chuột vào — giống ChatGPT. */
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 0.2s;
+}
+
+.scroll-thin:hover {
+  scrollbar-color: var(--c-border) transparent;
+}
+
+/* Định dạng markdown trong câu trả lời của AI (FR-08) */
+.markdown-body {
+  line-height: 1.75;
+  word-break: break-word;
+}
+
+.markdown-body > * + * {
+  margin-top: 1rem;
+}
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3 {
+  font-weight: 600;
+  line-height: 1.3;
+  margin-top: 1.5rem;
+}
+
+.markdown-body h1 {
+  font-size: 1.375rem;
+}
+
+.markdown-body h2 {
+  font-size: 1.175rem;
+}
+
+.markdown-body h3 {
+  font-size: 1rem;
+}
+
+.markdown-body ul,
+.markdown-body ol {
+  padding-left: 1.5rem;
+}
+
+.markdown-body ul {
+  list-style: disc;
+}
+
+.markdown-body ol {
+  list-style: decimal;
+}
+
+.markdown-body li + li {
+  margin-top: 0.35rem;
+}
+
+.markdown-body a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.markdown-body code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  background-color: var(--code-bg);
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.35rem;
+}
+
+.markdown-body pre {
+  background-color: var(--code-bg);
+  border: 1px solid var(--c-border);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  overflow-x: auto;
+}
+
+.markdown-body pre code {
+  background: none;
+  padding: 0;
+  font-size: 0.85rem;
+}
+
+.markdown-body blockquote {
+  border-left: 3px solid var(--c-border);
+  padding-left: 1rem;
+  color: var(--c-text-muted);
+}
+
+.markdown-body table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  display: block;
+  overflow-x: auto;
+}
+
+.markdown-body th,
+.markdown-body td {
+  border: 1px solid var(--c-border);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+
+.markdown-body th {
+  background-color: var(--c-bubble);
+}
+
+/* Con trỏ nhấp nháy khi đang stream */
+@keyframes caret-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+.streaming-caret::after {
+  content: '▍';
+  margin-left: 0.15rem;
+  animation: caret-blink 1s steps(1) infinite;
+}
