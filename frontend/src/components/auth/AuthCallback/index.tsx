@@ -17,16 +17,18 @@ export function AuthCallback() {
   const params = useSearchParams();
   const { adopt } = useAuth();
 
-  const [failure, setFailure] = useState<string | null>(params.get('error'));
+  // Tính lỗi ban đầu ngay khi render, tránh gọi setState đồng bộ trong effect:
+  // Google báo lỗi, hoặc quay về mà thiếu token.
+  const [failure, setFailure] = useState<string | null>(() => {
+    if (params.get('error')) return 'Đăng nhập Google bị huỷ hoặc thất bại.';
+    if (!params.get('access_token'))
+      return 'Thiếu thông tin đăng nhập trả về từ Google. Hãy thử lại.';
+    return null;
+  });
 
   useEffect(() => {
-    if (params.get('error')) return;
-
     const token = params.get('access_token');
-    if (!token) {
-      setFailure('Thiếu thông tin đăng nhập trả về từ Google. Hãy thử lại.');
-      return;
-    }
+    if (!token || params.get('error')) return;
 
     const expiresInRaw = params.get('expires_in');
     const expiresIn = expiresInRaw ? Number(expiresInRaw) : null;

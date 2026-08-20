@@ -11,20 +11,20 @@ Tiền tố chung: `/api/v1` (xem `API.prefix` trong `frontend/src/utils/constan
 | `POST /chat` | ☑ đã có | `services/chat/chatService.ts` |
 | `POST /chat/stream` | ◐ đã có, **cần thêm** `conversation_id` | `services/chat/chatService.ts` |
 | `GET /health` | ☑ đã có | `services/chat/chatService.ts` |
-| `POST /auth/register` | ☐ **cần làm** | `services/auth/authService.ts` |
-| `POST /auth/login` | ☐ **cần làm** | `services/auth/authService.ts` |
-| `GET /auth/me` | ☐ **cần làm** | `services/auth/authService.ts` |
-| `POST /auth/logout` | ☐ **cần làm** | `services/auth/authService.ts` |
-| `GET /auth/google/authorize` | ☐ **cần làm** | `utils/authUrl.ts` |
-| `GET /auth/google/callback` | ☐ **cần làm** | (Google gọi, không phải frontend) |
+| `POST /auth/register` | ☑ đã có | `services/auth/authService.ts` |
+| `POST /auth/login` | ☑ đã có | `services/auth/authService.ts` |
+| `GET /auth/me` | ☑ đã có | `services/auth/authService.ts` |
+| `POST /auth/logout` | ☑ đã có | `services/auth/authService.ts` |
+| `GET /auth/google/authorize` | ☑ đã có | `services/auth/authService.ts` |
+| `GET /auth/google/callback` | ☑ đã có | (Google gọi, không phải frontend) |
 | `GET /conversations` | ☐ **cần làm** | `services/chat/conversationService.ts` |
 | `GET /conversations/{id}` | ☐ **cần làm** | `services/chat/conversationService.ts` |
 | `POST /conversations` | ☐ **cần làm** | `services/chat/conversationService.ts` |
 | `PATCH /conversations/{id}` | ☐ **cần làm** | `services/chat/conversationService.ts` |
 | `DELETE /conversations/{id}` | ☐ **cần làm** | `services/chat/conversationService.ts` |
-| `GET /models` | ☐ **cần làm** | `services/settings/settingsService.ts` |
-| `GET /settings` | ☐ **cần làm** | `services/settings/settingsService.ts` |
-| `PUT /settings` | ☐ **cần làm** | `services/settings/settingsService.ts` |
+| `GET /models` | ☑ đã có | `services/settings/settingsService.ts` |
+| `GET /settings` | ☑ đã có | `services/settings/settingsService.ts` |
+| `PUT /settings` | ☑ đã có | `services/settings/settingsService.ts` |
 
 ## Quy ước chung
 
@@ -37,37 +37,19 @@ Tiền tố chung: `/api/v1` (xem `API.prefix` trong `frontend/src/utils/constan
 
 ---
 
-## Phiên đăng nhập: cookie, KHÔNG dùng JWT
+## Phiên đăng nhập: JWT bearer
 
-Backend cấp **session id đục** (opaque, tra trong bảng `sessions`), không phải JWT.
-Frontend không bao giờ cầm token: mọi request đều gửi kèm `credentials: 'include'`.
+Backend cấp **access token JWT** khi đăng nhập. Frontend lưu token (localStorage) và gửi
+lại ở header `Authorization: Bearer <token>` cho mọi request cần đăng nhập —
+`services/api.ts` tự gắn.
 
-Cần **hai** cookie:
+- Token sai / hết hạn / đã đăng xuất: **401**, frontend tự xoá phiên và về trạng thái khách.
+- Đăng xuất thu hồi token phía server (bảng `revoked_tokens`), nên token cũ không dùng lại được.
+- Đổi `JWT_SECRET` = vô hiệu hoá mọi token đang lưu hành.
 
-| Cookie | httpOnly | Secure | SameSite | Nội dung |
-|---|---|---|---|---|
-| `ai_chat_session` | ✅ | ✅ (prod) | `Lax` cùng domain, `None` khác domain | session id |
-| `ai-chat-client-auth-info` | ❌ | ✅ (prod) | như trên | JSON, xem dưới |
-
-Cookie thứ hai **không phải chứng thực** — nó chỉ để frontend vẽ đúng ngay từ khung hình
-đầu tiên, khỏi phải chờ `/auth/me`. Ai cũng sửa được nó, nên backend **tuyệt đối không**
-tin nó; quyền thật luôn tra từ `ai_chat_session`.
-
-```jsonc
-// Giá trị của ai-chat-client-auth-info (URL-encoded JSON)
-{
-  "user": { "id": "...", "email": "...", "display_name": "...", "avatar_url": null, "provider": "google" },
-  "theme": "dark",              // giúp đặt data-theme trước khi trang vẽ, tránh chớp sáng
-  "expires_at": 1755680000000   // mili giây
-}
-```
-
-Backend phải ghi lại cookie này **mỗi khi** user hoặc theme đổi (đăng nhập, `PUT /settings`),
-và xoá cả hai khi đăng xuất.
-
-> **CORS bắt buộc:** `allow_credentials=True` kèm **danh sách origin cụ thể**.
-> `allow_origins=["*"]` không dùng được với cookie — trình duyệt sẽ chặn.
-> Sửa ở `backend/app/main.py`, lấy từ `settings.cors_origins`.
+> **CORS:** `allow_origins` là **danh sách cụ thể** lấy từ `settings.cors_origins`
+> (không dùng `["*"]`). Danh sách này cũng là các origin được phép nhận token sau khi
+> đăng nhập Google.
 
 ---
 
@@ -79,28 +61,41 @@ và xoá cả hai khi đăng xuất.
 // Request
 { "email": "ban@congty.com", "password": "matkhau123", "display_name": "Nguyễn Văn A" }
 
-// Response 201 — kèm Set-Cookie cho cả hai cookie
-{ "user": { "id": "uuid", "email": "...", "display_name": "...", "avatar_url": null,
-            "provider": "password", "created_at": "2026-08-20T10:00:00Z" } }
+// Response 201
+{
+  "access_token": "eyJhbGciOi...",
+  "token_type": "bearer",
+  "expires_in": 604800,          // giây
+  "user": { "id": "uuid", "email": "...", "display_name": "...", "avatar_url": null,
+            "provider": "password", "created_at": "2026-08-20T10:00:00Z" }
+}
 ```
 
 Frontend đã kiểm trước khi gửi (`schemas/authSchema.ts`): email hợp lệ, mật khẩu 8–128 ký
-tự, tên hiển thị 1–60 ký tự. Backend **vẫn phải kiểm lại** — client không đáng tin.
+tự, tên hiển thị 1–60 ký tự. Backend **vẫn kiểm lại** — client không đáng tin.
 
 Email trùng: **409**, `code: "email_taken"`.
 
 ### `POST /auth/login`
 
 Request `{ "email": ..., "password": ... }`, response giống `/auth/register`.
-Sai thông tin: **401**, `code: "invalid_credentials"`.
+Sai thông tin: **401**, `code: "invalid_credentials"` (email không tồn tại cũng trả mã
+này để không lộ email nào đã đăng ký).
 
 ### `GET /auth/me`
 
-Cần cookie phiên. Response `{ "user": { ... } }`. Phiên hỏng/hết hạn: **401**.
+Cần token. Response là **object user trần** (không bọc `{ user }`):
+
+```jsonc
+{ "id": "uuid", "email": "...", "display_name": "...", "avatar_url": null,
+  "provider": "password", "created_at": "..." }
+```
+
+Token hỏng / hết hạn / đã đăng xuất: **401**.
 
 ### `POST /auth/logout`
 
-Xoá phiên trong DB và gỡ **cả hai** cookie. Response 200, body bất kỳ.
+Cần token. Thu hồi token hiện tại phía server. Response 200 `{ "detail": "Đã đăng xuất." }`.
 Frontend nuốt mọi lỗi ở đây vì trạng thái phía client đã dọn xong rồi.
 
 ---
@@ -119,11 +114,12 @@ Luồng chuẩn Authorization Code. Frontend **không** đụng tới token củ
 3. Google trả người dùng về:
      GET /api/v1/auth/google/callback?code=...&state=...
 
-4. Backend: đổi code lấy token → lấy hồ sơ → tạo/tìm user → tạo session
-   → Set-Cookie cả hai cookie
-   → 302 về redirect_uri đã lưu trong state
+4. Backend: đổi code lấy token → lấy hồ sơ → tạo/tìm/gắn user → cấp JWT
+   → 302 về redirect_uri kèm token ở query string:
+     {redirect_uri}?access_token=...&token_type=bearer&expires_in=604800
 
-5. Trang /auth/callback gọi GET /auth/me xác nhận rồi chuyển về "/"
+5. Trang /auth/callback đọc access_token khỏi query, lưu lại, gọi GET /auth/me,
+   rồi replaceState về "/" để token không nằm lại trong lịch sử trình duyệt
 ```
 
 ### `GET /auth/google/authorize`
@@ -135,16 +131,17 @@ Trả **302** sang Google.
 
 ### `GET /auth/google/callback`
 
-Google gọi, không phải frontend. Kết thúc bằng **302** về `redirect_uri`.
+Google gọi, không phải frontend. Kết thúc bằng **302** về `redirect_uri` kèm
+`access_token` ở query string.
 
-Lỗi thì vẫn 302 về `redirect_uri` nhưng kèm `?error=<thông điệp tiếng Việt>` —
-trang callback hiển thị nguyên văn chuỗi này.
+Lỗi (người dùng huỷ, state hỏng…) thì vẫn 302 về `redirect_uri` nhưng kèm
+`?error=<thông điệp>` thay cho token — trang callback hiển thị chuỗi này.
 
-> **Không** nhét token vào URL. Cookie đã set ở bước này rồi; token trên URL sẽ lọt vào
-> lịch sử trình duyệt, log máy chủ và header `Referer`.
+> Token nằm trên URL chỉ trong đúng một lần điều hướng: trang callback đọc xong là
+> `history.replaceState` về `/`, không để token lọt vào lịch sử trình duyệt.
 
-Biến môi trường cần thêm cho backend: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
-`GOOGLE_REDIRECT_URI`.
+Biến môi trường backend: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`.
+Bỏ trống hai biến đầu = tắt Google (`/auth/google/*` trả **503** `google_oauth_disabled`).
 
 ---
 
@@ -246,7 +243,7 @@ chạy lấy từ `/health`.
 
 ## Settings
 
-Cần cookie phiên. Cài đặt gắn theo tài khoản.
+Cần token. Cài đặt gắn theo tài khoản.
 
 ### `GET /settings`
 
@@ -268,8 +265,8 @@ Chưa có bản ghi thì trả mặc định như trên, **không** trả 404.
 
 Request `{ "settings": { ...y như trên... } }`, response giống `GET /settings`.
 
-> Khi `theme` đổi, backend **phải ghi lại** cookie `ai-chat-client-auth-info` với theme
-> mới. Không làm thì lần tải trang sau sẽ chớp sáng trước khi chuyển sang tối.
+> Theme cho lần tải trang sau do **frontend** tự nhớ (localStorage `ai-chat:theme`, đọc
+> trước khi vẽ để tránh chớp sáng). Backend không cần làm gì thêm cho việc này.
 
 ---
 
@@ -279,11 +276,13 @@ Chi tiết cột: xem `docs/DATABASE_SCHEMA.md`.
 
 | Bảng | Ghi chú |
 |---|---|
-| `users` | thêm `provider`, `google_sub` (unique, nullable), `avatar_url`; `password_hash` cho phép null với tài khoản Google |
-| `sessions` | `id` (session id đục), `user_id`, `expires_at`, `created_at` |
-| `conversations` | thêm `is_pinned boolean not null default false` |
-| `messages` | đã có trong thiết kế |
-| `user_settings` | 1–1 với `users`, các cột đúng như mục Settings |
+| `users` | ✅ đã tạo — `provider`, `google_sub` (unique, nullable), `avatar_url`; `password_hash` null với tài khoản Google |
+| `revoked_tokens` | ✅ đã tạo — `jti`, `user_id`, `expires_at` (thu hồi token khi đăng xuất) |
+| `user_settings` | ✅ đã tạo — 1–1 với `users`, các cột đúng như mục Settings |
+| `conversations` | ☐ thêm `is_pinned boolean not null default false` (FR-05, chưa làm) |
+| `messages` | ☐ đã có trong thiết kế (FR-05, chưa làm) |
+
+Ba bảng ✅ tạo bằng: `alembic upgrade head`.
 
 ---
 
@@ -293,9 +292,9 @@ Toàn bộ đã chuyển sang database:
 
 | Trước | Giờ |
 |---|---|
-| `localStorage['ai-chat:conversations']` | `GET/POST/PATCH/DELETE /conversations` |
-| `localStorage['ai-chat:settings']` | `GET/PUT /settings` |
-| `localStorage['ai-chat:auth']` | cookie `ai_chat_session` (httpOnly) |
+| `localStorage['ai-chat:conversations']` | `GET/POST/PATCH/DELETE /conversations` (FR-05, chưa làm) |
+| `localStorage['ai-chat:settings']` | `GET/PUT /settings` ✅ |
 
-Khách chưa đăng nhập vẫn chat được, nhưng hội thoại chỉ nằm trong bộ nhớ trang — tải lại
-là mất. Không có đường nào ghi xuống `localStorage` nữa.
+Frontend còn giữ ở `localStorage` đúng hai thứ nhẹ: `ai-chat:auth` (token JWT của phiên)
+và `ai-chat:theme` (để không chớp sáng lúc tải trang). Khách chưa đăng nhập vẫn chat được,
+nhưng hội thoại chỉ nằm trong bộ nhớ trang — tải lại là mất.

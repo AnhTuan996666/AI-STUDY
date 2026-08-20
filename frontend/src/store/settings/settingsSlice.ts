@@ -17,9 +17,21 @@ export interface SettingsState {
   error: string | null;
 }
 
-/** Theme comes from the readable cookie so the first frame is already correct instead of flashing light. */
+/** Reads the cached theme so the first frame is already correct instead of flashing light. */
+function readCachedTheme(): Theme | null {
+  if (typeof localStorage === 'undefined') return null;
+  const parsed = themeSchema.safeParse(localStorage.getItem(THEME_STORAGE_KEY));
+  return parsed.success ? parsed.data : null;
+}
+
+/** Persists the theme for the next first paint (both this slice and the layout bootstrap read it). */
+function cacheTheme(theme: Theme): void {
+  if (typeof localStorage === 'undefined') return;
+  localStorage.setItem(THEME_STORAGE_KEY, theme);
+}
+
 export function makeInitialSettingsState(): SettingsState {
-  const theme = readClientAuthInfo()?.theme;
+  const theme = readCachedTheme();
 
   return {
     settings: settingsSchema.parse(theme ? { theme } : {}),
@@ -37,10 +49,12 @@ const settingsSlice = createSlice({
     settingsChanged(state, action: PayloadAction<Partial<Settings>>) {
       state.settings = { ...state.settings, ...action.payload };
       state.error = null;
+      if (action.payload.theme) cacheTheme(action.payload.theme);
     },
 
     settingsReplaced(state, action: PayloadAction<Settings>) {
       state.settings = action.payload;
+      cacheTheme(action.payload.theme);
     },
 
     /** On sign-out, reset to defaults so the previous user's choices do not linger. */

@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 
 import { StoreProvider } from '@/providers/StoreProvider';
-import { CLIENT_AUTH_COOKIE } from '@/utils/constants';
+import { THEME_STORAGE_KEY } from '@/utils/constants';
 
 import './globals.css';
 
@@ -20,11 +20,9 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-/** Sets data-theme from the readable cookie before first paint, so the page never flashes light then dark. */
+/** Sets data-theme from the cached theme before first paint, so the page never flashes light then dark. */
 const THEME_BOOTSTRAP = `(function(){try{
-var m=document.cookie.match(/(?:^|; )${CLIENT_AUTH_COOKIE.replace(/-/g, '\\-')}=([^;]*)/);
-if(!m)return;
-var t=JSON.parse(decodeURIComponent(m[1])).theme;
+var t=localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)});
 if(t==='dark'||t==='light')document.documentElement.setAttribute('data-theme',t);
 }catch(e){}})();`;
 
