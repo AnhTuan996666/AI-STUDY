@@ -9,7 +9,7 @@ Tiền tố chung: `/api/v1` (xem `API.prefix` trong `frontend/src/utils/constan
 | Endpoint | Trạng thái | Frontend gọi ở |
 |---|---|---|
 | `POST /chat` | ☑ đã có | `services/chat/chatService.ts` |
-| `POST /chat/stream` | ◐ đã có, **cần thêm** `conversation_id` | `services/chat/chatService.ts` |
+| `POST /chat/stream` | ☑ đã có (lưu tin qua `conversation_id`) | `services/chat/chatService.ts` |
 | `GET /health` | ☑ đã có | `services/chat/chatService.ts` |
 | `POST /auth/register` | ☑ đã có | `services/auth/authService.ts` |
 | `POST /auth/login` | ☑ đã có | `services/auth/authService.ts` |
@@ -17,11 +17,11 @@ Tiền tố chung: `/api/v1` (xem `API.prefix` trong `frontend/src/utils/constan
 | `POST /auth/logout` | ☑ đã có | `services/auth/authService.ts` |
 | `GET /auth/google/authorize` | ☑ đã có | `services/auth/authService.ts` |
 | `GET /auth/google/callback` | ☑ đã có | (Google gọi, không phải frontend) |
-| `GET /conversations` | ☐ **cần làm** | `services/chat/conversationService.ts` |
-| `GET /conversations/{id}` | ☐ **cần làm** | `services/chat/conversationService.ts` |
-| `POST /conversations` | ☐ **cần làm** | `services/chat/conversationService.ts` |
-| `PATCH /conversations/{id}` | ☐ **cần làm** | `services/chat/conversationService.ts` |
-| `DELETE /conversations/{id}` | ☐ **cần làm** | `services/chat/conversationService.ts` |
+| `GET /conversations` | ☑ đã có | `services/chat/conversationService.ts` |
+| `GET /conversations/{id}` | ☑ đã có | `services/chat/conversationService.ts` |
+| `POST /conversations` | ☑ đã có | `services/chat/conversationService.ts` |
+| `PATCH /conversations/{id}` | ☑ đã có | `services/chat/conversationService.ts` |
+| `DELETE /conversations/{id}` | ☑ đã có | `services/chat/conversationService.ts` |
 | `GET /models` | ☑ đã có | `services/settings/settingsService.ts` |
 | `GET /settings` | ☑ đã có | `services/settings/settingsService.ts` |
 | `PUT /settings` | ☑ đã có | `services/settings/settingsService.ts` |
@@ -147,7 +147,7 @@ Bỏ trống hai biến đầu = tắt Google (`/auth/google/*` trả **503** `g
 
 ## Conversations
 
-Cần cookie phiên. Tất cả đều lọc theo user đang đăng nhập.
+Cần token. Tất cả đều lọc theo user đang đăng nhập.
 
 ### `GET /conversations`
 
@@ -279,10 +279,10 @@ Chi tiết cột: xem `docs/DATABASE_SCHEMA.md`.
 | `users` | ✅ đã tạo — `provider`, `google_sub` (unique, nullable), `avatar_url`; `password_hash` null với tài khoản Google |
 | `revoked_tokens` | ✅ đã tạo — `jti`, `user_id`, `expires_at` (thu hồi token khi đăng xuất) |
 | `user_settings` | ✅ đã tạo — 1–1 với `users`, các cột đúng như mục Settings |
-| `conversations` | ☐ thêm `is_pinned boolean not null default false` (FR-05, chưa làm) |
-| `messages` | ☐ đã có trong thiết kế (FR-05, chưa làm) |
+| `conversations` | ✅ đã tạo — kèm `is_pinned boolean not null default false` |
+| `messages` | ✅ đã tạo — role/content/token/latency, cascade theo conversation |
 
-Ba bảng ✅ tạo bằng: `alembic upgrade head`.
+Năm bảng ✅ tạo bằng: `alembic upgrade head`.
 
 ---
 
@@ -292,7 +292,7 @@ Toàn bộ đã chuyển sang database:
 
 | Trước | Giờ |
 |---|---|
-| `localStorage['ai-chat:conversations']` | `GET/POST/PATCH/DELETE /conversations` (FR-05, chưa làm) |
+| `localStorage['ai-chat:conversations']` | `GET/POST/PATCH/DELETE /conversations` ✅ |
 | `localStorage['ai-chat:settings']` | `GET/PUT /settings` ✅ |
 
 Frontend còn giữ ở `localStorage` đúng hai thứ nhẹ: `ai-chat:auth` (token JWT của phiên)

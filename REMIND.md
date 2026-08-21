@@ -322,8 +322,8 @@ Toàn bộ test **không cần Ollama** (dùng mock/fake transport).
 - [x] Auth: email/mật khẩu + Google OAuth (JWT) — FR-01, FR-02 ✅
 - [x] Lưu tài khoản + cài đặt vào PostgreSQL — FR-08 ✅
 - [x] Hàng đợi trước GPU (chống treo khi đông người) ✅
-- [ ] Lưu **lịch sử hội thoại** vào PostgreSQL — FR-05 (hiện vẫn ở localStorage FE)
-- [ ] Sidebar CRUD conversation gắn với DB — FR-06, FR-07
+- [x] Lưu **lịch sử hội thoại** vào PostgreSQL — FR-05 ✅ (`/conversations` + `conversation_id` trong `/chat/stream`)
+- [x] Sidebar CRUD conversation gắn với DB — FR-06, FR-07 ✅
 - [ ] Rate limit theo `user_id` thay vì IP — FR-09
 - [ ] Deploy: Vercel (FE) + Render (BE) + Cloudflare Tunnel (Ollama)
 

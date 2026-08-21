@@ -10,15 +10,15 @@ from __future__ import annotations
 
 from app.db.base import Base
 from app.modules.auth.models import RevokedTokenORM, UserORM
+from app.modules.conversations.models import ConversationORM, MessageORM
 from app.modules.settings.models import UserSettingsORM
-
-# Khi cắm lịch sử chat vào DB (FR-05), thêm:
-# from app.modules.conversations.models import ConversationORM, MessageORM
 
 target_metadata = Base.metadata
 
 __all__ = [
     "Base",
+    "ConversationORM",
+    "MessageORM",
     "RevokedTokenORM",
     "UserORM",
     "UserSettingsORM",

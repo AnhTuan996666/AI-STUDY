@@ -2,28 +2,39 @@
 
 from __future__ import annotations
 
+import asyncio
+import sys
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+# PHẢI đặt TRƯỚC khi uvicorn/asyncio tạo event loop: Windows mặc định dùng
+# ProactorEventLoop, nhưng driver psycopg (async) chỉ chạy trên SelectorEventLoop.
+# Không có dòng này thì mọi API đụng PostgreSQL sẽ lỗi ngay khi chạy uvicorn.
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-from app.api.router import api_router
-from app.core.config import Settings, get_settings
-from app.core.exceptions import register_exception_handlers
-from app.core.logging import get_logger, setup_logging
-from app.core.rate_limit import RateLimitMiddleware
-from app.db.session import create_database
-from app.modules.auth.google import GoogleOAuthClient
-from app.modules.auth.repository import InMemoryTokenBlocklist, InMemoryUserRepository
-from app.modules.conversations.repository import (
+from fastapi import FastAPI  # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+
+from app.api.router import api_router  # noqa: E402
+from app.core.config import Settings, get_settings  # noqa: E402
+from app.core.exceptions import register_exception_handlers  # noqa: E402
+from app.core.logging import get_logger, setup_logging  # noqa: E402
+from app.core.rate_limit import RateLimitMiddleware  # noqa: E402
+from app.db.session import create_database  # noqa: E402
+from app.modules.auth.google import GoogleOAuthClient  # noqa: E402
+from app.modules.auth.repository import (  # noqa: E402
+    InMemoryTokenBlocklist,
+    InMemoryUserRepository,
+)
+from app.modules.conversations.repository import (  # noqa: E402
     InMemoryConversationRepository,
     InMemoryMessageRepository,
 )
-from app.modules.health.schemas import RootResponse
-from app.modules.llm.providers.factory import create_provider
-from app.modules.llm.queue.factory import create_queue
-from app.modules.settings.repository import InMemorySettingsRepository
+from app.modules.health.schemas import RootResponse  # noqa: E402
+from app.modules.llm.providers.factory import create_provider  # noqa: E402
+from app.modules.llm.queue.factory import create_queue  # noqa: E402
+from app.modules.settings.repository import InMemorySettingsRepository  # noqa: E402
 
 logger = get_logger(__name__)
 
@@ -44,9 +55,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # repository chạy PostgreSQL; các bản in-memory dưới đây khi đó không được dùng tới.
     app.state.database = create_database(settings)
 
-    # Lịch sử hội thoại vẫn nằm ở trình duyệt (FR-05 chưa làm) nên luôn in-memory.
-    app.state.conversation_repository = InMemoryConversationRepository()
-    app.state.message_repository = InMemoryMessageRepository()
+    # Bản dự phòng cho lịch sử hội thoại khi chưa cấu hình DB. Conversation repo cần
+    # message repo để đếm số tin và xoá theo (SQL thì cascade lo, in-memory phải tự gọi).
+    message_repository = InMemoryMessageRepository()
+    app.state.message_repository = message_repository
+    app.state.conversation_repository = InMemoryConversationRepository(message_repository)
 
     # Bản dự phòng khi chưa cấu hình DB. Phải là MỘT instance cho cả app, nếu không
     # mỗi request lại đọc ra một kho rỗng.

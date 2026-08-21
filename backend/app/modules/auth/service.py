@@ -18,6 +18,7 @@ from app.core.security import (
     TokenPayload,
     UnauthorizedError,
     create_access_token,
+    decode_access_token,
     hash_password,
     needs_rehash,
     verify_password,
@@ -143,6 +144,20 @@ class AuthService:
             raise UnauthorizedError("Tài khoản không còn tồn tại.")
 
         return user
+
+    async def resolve_optional(self, token: str | None) -> User | None:
+        """User từ một bearer token thô, hoặc None nếu thiếu/hỏng/hết hạn/đã đăng xuất.
+
+        Dùng cho endpoint cho phép cả khách (vd /chat). Giải mã bằng CHÍNH settings của
+        service — cùng nguồn với lúc cấp token — nên không bao giờ lệch khoá ký.
+        """
+        if not token:
+            return None
+        try:
+            payload = decode_access_token(token, self._settings)
+            return await self.resolve(payload)
+        except UnauthorizedError:
+            return None
 
     async def logout(self, payload: TokenPayload) -> None:
         """Thu hồi token hiện tại. Gọi lại lần nữa vẫn an toàn."""

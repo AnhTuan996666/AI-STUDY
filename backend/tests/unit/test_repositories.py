@@ -73,32 +73,43 @@ async def test_list_by_user_respects_limit(
     assert len(await conversations.list_by_user(USER_A, limit=3)) == 3
 
 
-async def test_rename_updates_title(
+async def test_update_changes_title(
     conversations: InMemoryConversationRepository,
 ) -> None:
     created = await conversations.create(Conversation(user_id=USER_A))
 
-    renamed = await conversations.rename(created.id, "  Tên mới  ")
+    updated = await conversations.update(created.id, title="  Tên mới  ")
 
-    assert renamed is not None
-    assert renamed.title == "Tên mới"
+    assert updated is not None
+    assert updated.title == "Tên mới"
 
 
-async def test_rename_ignores_blank_title(
+async def test_update_toggles_pin(
+    conversations: InMemoryConversationRepository,
+) -> None:
+    created = await conversations.create(Conversation(user_id=USER_A))
+
+    updated = await conversations.update(created.id, is_pinned=True)
+
+    assert updated is not None
+    assert updated.is_pinned is True
+
+
+async def test_update_ignores_blank_title(
     conversations: InMemoryConversationRepository,
 ) -> None:
     created = await conversations.create(Conversation(user_id=USER_A, title="Giữ nguyên"))
 
-    renamed = await conversations.rename(created.id, "   ")
+    updated = await conversations.update(created.id, title="   ")
 
-    assert renamed is not None
-    assert renamed.title == "Giữ nguyên"
+    assert updated is not None
+    assert updated.title == "Giữ nguyên"
 
 
-async def test_rename_missing_returns_none(
+async def test_update_missing_returns_none(
     conversations: InMemoryConversationRepository,
 ) -> None:
-    assert await conversations.rename(uuid4(), "x") is None
+    assert await conversations.update(uuid4(), title="x") is None
 
 
 async def test_delete_removes_conversation(

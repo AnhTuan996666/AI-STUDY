@@ -11,12 +11,18 @@ Nhờ vậy `alembic revision --autogenerate` luôn nhìn thấy đúng những 
 from __future__ import annotations
 
 import asyncio
+import sys
 
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from alembic import context
 from app.core.config import get_settings
 from app.db.registry import target_metadata
+
+# Windows mặc định dùng ProactorEventLoop, nhưng psycopg (async) chỉ chạy trên
+# SelectorEventLoop. Ép policy trước khi asyncio.run() để `alembic upgrade` không lỗi.
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 config = context.config
 settings = get_settings()

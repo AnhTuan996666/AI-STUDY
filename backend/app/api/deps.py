@@ -37,7 +37,14 @@ from app.modules.auth.repository import (
 )
 from app.modules.auth.service import AuthService
 from app.modules.chat.service import ChatService
-from app.modules.conversations.repository import ConversationRepository, MessageRepository
+from app.modules.conversations.history_writer import ChatHistoryWriter
+from app.modules.conversations.repository import (
+    ConversationRepository,
+    MessageRepository,
+    SqlConversationRepository,
+    SqlMessageRepository,
+)
+from app.modules.conversations.service import ConversationService
 from app.modules.llm.providers.base import LLMProvider
 from app.modules.llm.queue.base import RequestQueue
 from app.modules.llm.service import ModelService
@@ -117,13 +124,16 @@ def get_settings_repository(request: Request, session: SessionDep) -> SettingsRe
     return SqlSettingsRepository(session)
 
 
-def get_conversation_repository(request: Request) -> ConversationRepository:
-    """Lịch sử hội thoại vẫn in-memory — FR-05 chưa chuyển lên database."""
-    return request.app.state.conversation_repository
+def get_conversation_repository(request: Request, session: SessionDep) -> ConversationRepository:
+    if session is None:
+        return request.app.state.conversation_repository
+    return SqlConversationRepository(session)
 
 
-def get_message_repository(request: Request) -> MessageRepository:
-    return request.app.state.message_repository
+def get_message_repository(request: Request, session: SessionDep) -> MessageRepository:
+    if session is None:
+        return request.app.state.message_repository
+    return SqlMessageRepository(session)
 
 
 UserRepositoryDep = Annotated[UserRepository, Depends(get_user_repository)]
@@ -148,6 +158,13 @@ def get_settings_service(repository: SettingsRepositoryDep) -> SettingsService:
     return SettingsService(repository=repository)
 
 
+def get_conversation_service(
+    conversations: ConversationRepositoryDep,
+    messages: MessageRepositoryDep,
+) -> ConversationService:
+    return ConversationService(conversations=conversations, messages=messages)
+
+
 def get_model_service(provider: ProviderDep, settings: SettingsDep) -> ModelService:
     return ModelService(provider=provider, settings=settings)
 
@@ -161,10 +178,25 @@ def get_chat_service(
     return ChatService(provider=provider, settings=settings, queue=queue, client_key=key)
 
 
+def get_chat_history_writer(request: Request) -> ChatHistoryWriter:
+    """Bộ ghi lịch sử chat: mỗi lần ghi tự mở transaction riêng (xem history_writer.py).
+
+    Không dùng session theo request để phần đã sinh vẫn được lưu khi client ngắt stream.
+    """
+    database: Database | None = request.app.state.database
+    fallback = ConversationService(
+        conversations=request.app.state.conversation_repository,
+        messages=request.app.state.message_repository,
+    )
+    return ChatHistoryWriter(database, fallback)
+
+
 AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]
 SettingsServiceDep = Annotated[SettingsService, Depends(get_settings_service)]
+ConversationServiceDep = Annotated[ConversationService, Depends(get_conversation_service)]
 ModelServiceDep = Annotated[ModelService, Depends(get_model_service)]
 ChatServiceDep = Annotated[ChatService, Depends(get_chat_service)]
+ChatHistoryWriterDep = Annotated[ChatHistoryWriter, Depends(get_chat_history_writer)]
 
 
 # ========================== 4. Người dùng ===============================
@@ -193,3 +225,15 @@ async def get_current_user(payload: TokenPayloadDep, auth: AuthServiceDep) -> Us
 
 
 CurrentUserDep = Annotated[User, Depends(get_current_user)]
+
+
+async def get_optional_user(request: Request, auth: AuthServiceDep) -> User | None:
+    """User đang đăng nhập, hoặc None nếu là khách.
+
+    Dùng cho `/chat` (khách vẫn chat được, nhưng chỉ user đăng nhập mới lưu lịch sử).
+    Token thiếu/hỏng/hết hạn cũng trả None thay vì 401 — không chặn khách.
+    """
+    return await auth.resolve_optional(extract_bearer_token(request))
+
+
+OptionalUserDep = Annotated[User | None, Depends(get_optional_user)]

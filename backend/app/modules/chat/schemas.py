@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Literal
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -22,8 +23,9 @@ class ChatRequest(BaseModel):
     messages: list[ChatMessage] = Field(min_length=1, max_length=200)
     model: str | None = Field(default=None, description="Ghi đè model mặc định")
     temperature: float = Field(default=0.7, ge=0.0, le=2.0)
-    conversation_id: str | None = Field(
-        default=None, description="Dành cho giai đoạn có DB; hiện chỉ dùng để log"
+    conversation_id: UUID | None = Field(
+        default=None,
+        description="Có id + đã đăng nhập -> backend tự lưu tin nhắn vào hội thoại này",
     )
 
     model_config = {
